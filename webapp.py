@@ -27,6 +27,32 @@ def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+def classify_image(file):
+    '''
+    INPUT:
+    file - (FileStorage) file with image to be classified
+
+    OUTPUT:
+    message  - (str) output message
+    
+    Description:
+    Store image in a temporary directory and classify the dog breed.
+    Returns the message to be rendered in the front end.
+    '''
+    filename = secure_filename(file.filename)
+    img_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    file.save(img_path)
+       
+    if dog_detector(img_path):
+        dog_breed = dog_breed_detector(img_path)
+        message = {'message': 'We have a dog there and I think it is a <i> {:} </i><br/>'.format(dog_breed.replace('_',' ')) }
+    else:
+        if face_detector(img_path):
+            dog_breed = dog_breed_detector(img_path)
+            message = {'message': 'Not a dog hun! But isnt just like a <i> {:} </i><br/>'.format(dog_breed.replace('_',' ')) }
+
+    return message
+
 # index webpage with dog breed detector app
 @app.route('/')
 @app.route('/index')
@@ -57,36 +83,15 @@ def upload_file():
     files = request.files.getlist('files[]')
 
     errors = {}
-    success = False
 
     for file in files:
         if file and allowed_file(file.filename):
-            filename = secure_filename(file.filename)
-            img_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            file.save(img_path)
-            success = True
+            message = classify_image(file)
+            resp = jsonify(message)
+            resp.status_code = 201
+            return resp
         else:
             errors[file.filename] = 'File type is not allowed'
-
-    if success:
-
-        print("Classify image: {:}".format(img_path))
-        
-        dog_breed = 'not a dog'
-        isDog = dog_detector(img_path)
-        
-        if isDog:
-            dog_breed = dog_breed_detector(img_path)
-            response = {'message': 'We have a dog there and I think it is a <i> {:} </i><br/>'.format(dog_breed.replace('_',' ')) }
-        else:
-            if face_detector(img_path):
-                dog_breed = dog_breed_detector(img_path)
-                response = {'message': 'Not a dog hun! But isnt just like a <i> {:} </i><br/>'.format(dog_breed.replace('_',' ')) }
-
-        resp = jsonify(response)
-        resp.status_code = 201
-
-        return resp
 
 def main():
     app.run(host='0.0.0.0', port=3001, debug=True)
