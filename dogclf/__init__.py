@@ -19,7 +19,7 @@ f.close()
 # extract pre-trained face detector
 face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_alt.xml")
 
-# pre-trained model for detecting dogs
+# pre-trained model on imagenet dataset
 ResNet50_model = ResNet50(weights='imagenet')
                             
 # ResNet-50 model to detect dog breed
@@ -180,6 +180,6 @@ def dog_breed_detector(img_path):
             print('Resembling dog breed: {:}'.format(breed_id))
 
         else:
-            raise("Image does not contain a dog or a human face")
+            raise("Image does not contain a dog nor a human face")
 
         return breed_id
