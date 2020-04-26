@@ -12,7 +12,7 @@ from keras.models import Sequential
 import tensorflow as tf
 from tqdm import tqdm
 
-with open('data/dog-names.json','r') as f:
+with open('models/dog_names.json','r') as f:
   dog_names = json.load(f)
 f.close()
 
@@ -26,7 +26,7 @@ ResNet50_model = ResNet50(weights='imagenet')
 Resnet50_model_breed = Sequential()
 Resnet50_model_breed.add(GlobalAveragePooling2D(input_shape=(1,1,2048)))
 Resnet50_model_breed.add(Dense(133, activation='softmax'))
-Resnet50_model_breed.load_weights('data/weights.best.Resnet50.hdf5')
+Resnet50_model_breed.load_weights('models/weights_best_Resnet50.hdf5')
 
 # to ensure the graph is the same across all threads
 graph = tf.get_default_graph()
