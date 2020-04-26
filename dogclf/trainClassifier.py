@@ -3,6 +3,7 @@ import numpy as np
 import json
 from glob import glob
 
+from sklearn import metrics
 from sklearn.datasets import load_files
 from keras.utils import np_utils
 from keras.layers import Conv2D, MaxPooling2D, GlobalAveragePooling2D
@@ -79,9 +80,8 @@ def plot_fit_history(history,filepath):
 
     fig.savefig(filepath)
 
-def train_CNN(train_features,train_targets,
+def train_model(train_features,train_targets,
             valid_features,valid_targets,
-            test_features,test_targets,
             dropout=0.0,
             epochs=10,
             filepath='weights.best.model.hdf5'):
@@ -93,13 +93,11 @@ def train_CNN(train_features,train_targets,
     train_targets - (ndarray) array with train labels
     valid_features - (tensor) validation bottleneck features
     valid_targets - (ndarray) array with valid labels
-    test_features - (tensor) test bottleneck features
-    test_targets - (ndarray) array with test labels
     dropout     - (float) drop-out factor
     filepath    - (str) path where to save best model
 
     OUTPUT:
-    None
+    model       - model with the best validation loss
 
     Description:
     Applies transfer learning using bottleneck features from a Keras CNN model to train the model
@@ -133,16 +131,41 @@ def train_CNN(train_features,train_targets,
     # Load the Model with the Best Validation Loss
     model.load_weights(filepath)
 
+    return model
+
+def evaluate_model(model,test_features,test_targets):
+    '''
+    INPUT:
+    test_features - (tensor) test bottleneck features
+    test_targets - (ndarray) array with test labels
+    model       - model with the best validation loss
+
+    OUTPUT:
+    None
+
+    Description:
+    Evaluate model scores on test dataset.
+    '''
     # Test the Model
     # Calculate classification accuracy on the test dataset.
-    # get index of predicted dog breed for each image in test set
-    predictions = np.array([np.argmax(model.predict(np.expand_dims(feature, axis=0))) for feature in test_features])
+    # Get index of class for each image in test set
+    y_pred = np.array([np.argmax(model.predict(np.expand_dims(feature, axis=0))) for feature in test_features])
+    y_true = np.argmax(test_targets, axis=1)
 
-    # report test accuracy
-    test_accuracy = 100*np.sum(np.equal(predictions,np.argmax(test_targets, axis=1)))/len(predictions)
-    print('Test accuracy: %.4f%%' % test_accuracy)
+    # Report test accuracy
+    test_accuracy = 100*np.sum(np.equal(y_pred,y_true))/len(y_pred)
+    test_balanced_accuracy_score = metrics.balanced_accuracy_score(y_true, y_pred)
+    test_confusion_matrix = metrics.confusion_matrix(y_true, y_pred)
 
+    report = dict()
+    report['accuracy']                  = test_accuracy
+    report['balanced_accuracy_score']   = test_balanced_accuracy_score
+    report['confusion_matrix']          = test_confusion_matrix
 
+    print(f"Test accuracy: {test_accuracy:.4f}%%")
+    print(f"Balanced accuracy score: {test_balanced_accuracy_score:.4f}")
+
+    return report
 
 
 # Import Dog Dataset
@@ -170,9 +193,17 @@ valid_Resnet50 = bottleneck_features['valid']
 test_Resnet50 = bottleneck_features['test']
 
 # Train network
-train_CNN(train_Resnet50,train_targets,
-            valid_Resnet50,valid_targets,
-            test_Resnet50,test_targets,
-            dropout=0.50,
-            epochs=50,
-            filepath='models/weights_best_Resnet50.hdf5')
+model = train_model(train_Resnet50,train_targets,
+                    valid_Resnet50,valid_targets,
+                    dropout=0.50,
+                    epochs=50,
+                    filepath='models/weights_best_Resnet50.hdf5')
+
+# Evaluate network
+report = evaluate_model(model,test_Resnet50,test_targets)
+plt.clf() #clears matplotlib data and axes
+plt.imshow(report['confusion_matrix'])
+plt.savefig('models/weights_best_Resnet50_confusion_matrix.png')
+report['confusion_matrix'] = report['confusion_matrix'].tolist()
+with open('models/weights_best_Resnet50_eval_report.json', 'w') as fp:
+    json.dump(report, fp)
