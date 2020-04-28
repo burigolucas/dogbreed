@@ -1,7 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import json
-from glob import glob
 
 from sklearn import metrics
 from sklearn.datasets import load_files
@@ -19,22 +18,7 @@ ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 from tqdm import tqdm
 
-def load_dataset(dirpath):
-    '''
-    INPUT:
-    dirpath  - (str)  path where images are located with sub-directories per category
-
-    OUTPUT:
-    None
-
-    Description:
-    Load datasets from dirpath
-    '''
-    data = load_files(dirpath)
-    files = np.array(data['filenames'])
-    targets = np_utils.to_categorical(np.array(data['target']), 133)
-    return files, targets
-
+# Helper function to ouput history of training
 def plot_fit_history(history,filepath):
     '''
     INPUT:
@@ -45,12 +29,10 @@ def plot_fit_history(history,filepath):
     None
 
     Description:
-    Plots history of CNN model fiting on training and validation sets.
+    Plot history of CNN model fiting on training and validation sets to a file
     '''
     plt.clf() #clears matplotlib data and axes
-    fig = plt.figure(figsize=[12,4])
-    ax1 = plt.subplot(1, 2, 1)
-    ax2 = plt.subplot(1, 2, 2)
+    fig, (ax1, ax2) = plt.subplots(2, sharex=True)
         
     loss = history['loss']
     val_loss = history['val_loss']
@@ -78,8 +60,12 @@ def plot_fit_history(history,filepath):
     ax2.set_ylabel('accuracy')
     ax2.legend()
 
-    fig.savefig(filepath)
+    fig.savefig(filepath,
+                bbox_inches='tight',
+                size=(3,4),
+                dpi=250)
 
+# Function to train the CNN model
 def train_model(train_features,train_targets,
             valid_features,valid_targets,
             dropout=0.0,
@@ -123,8 +109,9 @@ def train_model(train_features,train_targets,
             validation_data=(valid_features, valid_targets),
             epochs=epochs, batch_size=32, callbacks=[checkpointer,early_stopper], verbose=1)
 
+    print(fit_history.history)
     with open(filepath.split('.hdf5')[0]+'_fit_history.json', 'w') as fp:
-        json.dump(fit_history.history, fp)
+        json.dump(str(fit_history.history), fp)
         
     plot_fit_history(fit_history.history,filepath.split('.hdf5')[0]+'_fit_history.png')
 
@@ -133,6 +120,7 @@ def train_model(train_features,train_targets,
 
     return model
 
+# Function to evaluate the CNN model on test data
 def evaluate_model(model,test_features,test_targets):
     '''
     INPUT:
@@ -152,58 +140,105 @@ def evaluate_model(model,test_features,test_targets):
     y_pred = np.array([np.argmax(model.predict(np.expand_dims(feature, axis=0))) for feature in test_features])
     y_true = np.argmax(test_targets, axis=1)
 
+    y_true_arr = test_targets
+
+    index_array = [np.arange(y_true_arr.shape[0]), y_pred]
+    y_pred_arr = np.zeros(y_true_arr.shape)
+    flat_index_array = np.ravel_multi_index(
+        index_array,
+        y_pred_arr.shape)
+    np.ravel(y_pred_arr)[flat_index_array] = 1
+
     # Report test accuracy
-    test_accuracy = 100*np.sum(np.equal(y_pred,y_true))/len(y_pred)
+    test_accuracy = metrics.accuracy_score(y_true,y_pred)
     test_balanced_accuracy_score = metrics.balanced_accuracy_score(y_true, y_pred)
+    test_f1_micro = metrics.f1_score(y_true=y_true_arr,y_pred=y_pred_arr,average="micro")
+    test_f1_macro = metrics.f1_score(y_true=y_true_arr,y_pred=y_pred_arr,average="macro")
+    test_f1_weighted = metrics.f1_score(y_true=y_true_arr,y_pred=y_pred_arr,average="weighted")
     test_confusion_matrix = metrics.confusion_matrix(y_true, y_pred)
+    # Evaluate model on each category
+    test_category_reports = []
+    for colIx in range(y_true_arr.shape[1]):
+        print(f"Computing classification report for col: {colIx}")
+        print(metrics.classification_report(y_true_arr[:,colIx], y_pred_arr[:,colIx],output_dict=False))
+        test_category_reports.append(metrics.classification_report(y_true_arr[:,colIx], y_pred_arr[:,colIx],output_dict=True))
 
     report = dict()
     report['accuracy']                  = test_accuracy
     report['balanced_accuracy_score']   = test_balanced_accuracy_score
+    report['f1_micro']                  = test_f1_micro
+    report['f1_macro']                  = test_f1_macro
+    report['f1_weighted']               = test_f1_weighted
     report['confusion_matrix']          = test_confusion_matrix
+    report['category_reports']          = test_category_reports
 
-    print(f"Test accuracy: {test_accuracy:.4f}%%")
-    print(f"Balanced accuracy score: {test_balanced_accuracy_score:.4f}")
+    print("Model evaluation scores: ")
+    print(f"\tAccuracy: {test_accuracy:.4f}")
+    print(f"\tBalanced accuracy score: {test_balanced_accuracy_score:.4f}")
+    print(f"\tF1 (micro): {test_f1_micro:.4f}")
+    print(f"\tF1 (macro): {test_f1_macro:.4f}")
+    print(f"\tF1 (weighted): {test_f1_weighted:.4f}")
 
     return report
 
+# Load bottleneck features and targets
+with np.load('data/bottleneck_resnet50.npz') as data:
+    train_features = data['train_features']
+    train_targets = data['train_targets']
+    valid_features = data['valid_features']
+    valid_targets = data['valid_targets']
+    test_features = data['test_features']
+    test_targets = data['test_targets']
 
-# Import Dog Dataset
-# load train, test, and validation datasets
-train_files, train_targets = load_dataset('data/dogImages/train')
-valid_files, valid_targets = load_dataset('data/dogImages/valid')
-test_files, test_targets = load_dataset('data/dogImages/test')
-
-# Load list of dog names
-dog_names = [item[25:-1] for item in sorted(glob("data/dogImages/train/*/"))]
-with open('models/dog_names.json', 'w') as fp:
-    json.dump(dog_names, fp)
-
-# Print statistics about the dataset
-print('There are %d total dog categories.' % len(dog_names))
-print('There are %s total dog images.\n' % len(np.hstack([train_files, valid_files, test_files])))
-print('There are %d training dog images.' % len(train_files))
-print('There are %d validation dog images.' % len(valid_files))
-print('There are %d test dog images.'% len(test_files))
-
-# Obtain Bottleneck Features
-bottleneck_features = np.load('data/bottleneck_features/DogResnet50Data.npz')
-train_Resnet50 = bottleneck_features['train']
-valid_Resnet50 = bottleneck_features['valid']
-test_Resnet50 = bottleneck_features['test']
+# Label used to save the best model
+model_label = 'Resnet50'
 
 # Train network
-model = train_model(train_Resnet50,train_targets,
-                    valid_Resnet50,valid_targets,
+model = train_model(train_features,train_targets,
+                    valid_features,valid_targets,
                     dropout=0.50,
                     epochs=50,
-                    filepath='models/weights_best_Resnet50.hdf5')
+                    filepath=f'data/model_weights_best_{model_label}.hdf5')
 
 # Evaluate network
-report = evaluate_model(model,test_Resnet50,test_targets)
-plt.clf() #clears matplotlib data and axes
-plt.imshow(report['confusion_matrix'])
-plt.savefig('models/weights_best_Resnet50_confusion_matrix.png')
+report = evaluate_model(model,test_features,test_targets)
+confMatrix = report['confusion_matrix']
+
+# Store the confusion matrix in a JSON file for analysis
 report['confusion_matrix'] = report['confusion_matrix'].tolist()
-with open('models/weights_best_Resnet50_eval_report.json', 'w') as fp:
+with open(f'data/model_weights_best_{model_label}_eval_report.json', 'w') as fp:
     json.dump(report, fp)
+
+# Plot the confusion matrix and save to file
+plt.clf()
+fig = plt.figure(figsize=[6,4],dpi=150)
+ax = plt.subplot(1, 1, 1)
+pos = ax.imshow(confMatrix,cmap=plt.cm.Blues)
+fig.colorbar(pos, ax=ax)
+ax.set_xlabel('Predicted category')
+ax.set_ylabel('True category')
+ax.set_title('Confusion matrix')
+fig.savefig(f'data/model_weights_best_{model_label}_confusion_matrix.png',
+            bbox_inches='tight',
+            size=(3,2),
+            dpi=250)
+
+# Plot normalized confusion matrix and save to file
+plt.clf()
+fig = plt.figure(figsize=[6,4],dpi=150)
+ax = plt.subplot(1, 1, 1)
+# normalize confusion matrix
+for ix in range(confMatrix.shape[0]):
+    if confMatrix[ix,:].sum() > 0:
+        confMatrix[ix,:] = confMatrix[ix,:]/confMatrix[ix,:].sum()
+    else:
+        print(f"No test data for category {ix}")
+pos = ax.imshow(confMatrix,cmap=plt.cm.Blues)
+fig.colorbar(pos, ax=ax)
+ax.set_xlabel('Predicted category')
+ax.set_ylabel('True category')
+ax.set_title('Normalized confusion matrix')
+fig.savefig(f'data/model_weights_best_{model_label}_confusion_matrix_normalized.png',
+            bbox_inches='tight',
+            size=(3,2),
+            dpi=250)

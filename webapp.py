@@ -3,16 +3,17 @@ from flask import Flask, flash, request, redirect, url_for
 from flask import render_template, jsonify
 from werkzeug.utils import secure_filename
 
+# Import dog bree classifier and functions
 import dogclf
 from dogclf import dog_detector, dog_breed_detector, face_detector        
 
-UPLOAD_FOLDER = 'tmp_files'
+UPLOAD_FOLDER = 'cache'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-# check for image extension
+# Check for image extension
 def allowed_file(filename):
     '''
     INPUT:
@@ -27,6 +28,7 @@ def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+# Helper function to classify dog bree from a file
 def classify_image(file):
     '''
     INPUT:
