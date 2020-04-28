@@ -7,6 +7,7 @@ from werkzeug.utils import secure_filename
 import dogclf
 from dogclf import dog_detector, dog_breed_detector, face_detector        
 
+# Direction where uploaded images by user are stored for classification
 UPLOAD_FOLDER = 'cache'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
