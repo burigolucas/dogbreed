@@ -20,27 +20,31 @@ sess = tf.Session()
 graph = tf.compat.v1.get_default_graph()
 
 with open('data/dog_names.json','r') as f:
-  dog_names = json.load(f)
+    dog_names = json.load(f)
 f.close()
 
 # extract pre-trained face detector
 face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_alt.xml")
 
-# pre-trained model on imagenet dataset
+# Pre-trained model on imagenet dataset used to detect dogs
 with graph.as_default():
     set_session(sess)
-    ResNet50_model = ResNet50(weights='imagenet')
+    imagenet_model = ResNet50(weights='imagenet')
                             
-# ResNet-50 model to detect dog breed
+# ResNet-50 model to classify dog breed classification
 with graph.as_default():
     set_session(sess)
-    Resnet50_model_breed = Sequential()
-    Resnet50_model_breed.add(GlobalAveragePooling2D(input_shape=(1,1,2048)))
-    Resnet50_model_breed.add(Dense(133, activation='softmax'))
-    Resnet50_model_breed.load_weights('data/model_weights_best_Resnet50.hdf5')
+    dogBreedCNN = Sequential()
+    dogBreedCNN.add(GlobalAveragePooling2D(input_shape=(1,1,2048)))
+    dogBreedCNN.add(Dense(133, activation='softmax'))
+    dogBreedCNN.load_weights('data/model_weights_best_Resnet50.hdf5')
 
-# Implementation of face detector
-def face_detector(img_path):
+with graph.as_default():
+    set_session(sess)
+    featureExtractor = ResNet50(weights='imagenet', include_top=False)
+
+# Implementation of face detection
+def detect_human_face(img_path):
     '''
     INPUT:
     img_path    path of image 
@@ -60,7 +64,7 @@ def face_detector(img_path):
         return len(faces) > 0
 
 # Implementation of transformatin of image to tensor
-def path_to_tensor(img_path):
+def convert_path_to_tensor(img_path):
     '''
     INPUT:
     img_path    path of image 
@@ -81,7 +85,7 @@ def path_to_tensor(img_path):
         return np.expand_dims(x, axis=0)
 
 # Helper funcation to load set of images and transfor to tensors
-def paths_to_tensor(img_paths):
+def convert_paths_to_tensor(img_paths):
     '''
     INPUT:
     img_path    (list) paths of images to convert to tensor
@@ -90,11 +94,11 @@ def paths_to_tensor(img_paths):
     vstack of 4D tensors
     '''    
 
-    list_of_tensors = [path_to_tensor(img_path) for img_path in tqdm(img_paths)]
+    list_of_tensors = [convert_path_to_tensor(img_path) for img_path in tqdm(img_paths)]
     return np.vstack(list_of_tensors)
 
 # Function to predict the labels from ImageNet
-def ResNet50_predict_labels(img_path):
+def predict_imagenet_labels(img_path):
     '''
     INPUT:
     img_path    path of image 
@@ -108,13 +112,13 @@ def ResNet50_predict_labels(img_path):
     global graph
     with graph.as_default():
         set_session(sess)
-        img = preprocess_input(path_to_tensor(img_path))
-        prediction = ResNet50_model.predict(img)
+        img = preprocess_input(convert_path_to_tensor(img_path))
+        prediction = imagenet_model.predict(img)
 
         return np.argmax(prediction)
 
 # Dog detector according to labels from ImageNet
-def dog_detector(img_path):
+def detect_dog(img_path):
     '''
     INPUT:
     img_path    path of image 
@@ -125,29 +129,29 @@ def dog_detector(img_path):
     Description:
     Returns "True" if a dog is detected in the image stored at img_path
     '''    
-    prediction = ResNet50_predict_labels(img_path)
+    prediction = predict_imagenet_labels(img_path)
     return ((prediction <= 268) & (prediction >= 151)) 
 
-# Helper function to generate bottleneck features from ResNet-50 model
-def extract_Resnet50(tensor):
+# Helper function to generate bottleneck features from CNN
+def extract_bottleneck_features(tensor):
     '''
     INPUT:
     Image tensor
 
     OUTPUT:
-    ResNet50 features
+    bottleneck features
     
     Description:
-    Extract ResNet50 features
+    Extract bottleneck features
     '''    
     global graph
     with graph.as_default():
         set_session(sess)
 
-        return ResNet50(weights='imagenet', include_top=False).predict(preprocess_input(tensor))
+        return featureExtractor.predict(preprocess_input(tensor))
 
 # Classification of dog breed
-def Resnet50_predict_breed(img_path):
+def predict_breed(img_path):
     '''
     INPUT:
     img_path    path of image 
@@ -162,15 +166,15 @@ def Resnet50_predict_breed(img_path):
     with graph.as_default():
         set_session(sess)
 
-        # extract bottleneck features
-        bottleneck_feature = extract_Resnet50(path_to_tensor(img_path))
+        # extract features
+        features = extract_bottleneck_features(convert_path_to_tensor(img_path))
         # obtain predicted vector
-        predicted_vector = Resnet50_model_breed.predict(bottleneck_feature)
+        predicted_vector = dogBreedCNN.predict(features)
         # return dog breed that is predicted by the model
         return dog_names[np.argmax(predicted_vector)]
 
 # Algorithm to obtain dog breed from dog images or resembling dog breed from human face
-def dog_breed_detector(img_path):
+def classify_dog_breed(img_path):
     '''
     INPUT:
     img_path    path of image 
@@ -186,14 +190,14 @@ def dog_breed_detector(img_path):
     with graph.as_default():
         breed_id = None
         
-        if dog_detector(img_path):
+        if detect_dog(img_path):
             # image contains a dog
-            breed_id =  Resnet50_predict_breed(img_path)
+            breed_id =  predict_breed(img_path)
             print('Dog breed: {:}'.format(breed_id))
 
-        elif face_detector(img_path):
+        elif detect_human_face(img_path):
             # image contains a human face
-            breed_id =  Resnet50_predict_breed(img_path)
+            breed_id =  predict_breed(img_path)
             print('Resembling dog breed: {:}'.format(breed_id))
 
         else:
