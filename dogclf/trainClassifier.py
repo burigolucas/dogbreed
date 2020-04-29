@@ -181,64 +181,70 @@ def evaluate_model(model,test_features,test_targets):
 
     return report
 
-# Load bottleneck features and targets
-with np.load('data/bottleneck_resnet50.npz') as data:
-    train_features = data['train_features']
-    train_targets = data['train_targets']
-    valid_features = data['valid_features']
-    valid_targets = data['valid_targets']
-    test_features = data['test_features']
-    test_targets = data['test_targets']
 
-# Label used to save the best model
-model_label = 'Resnet50'
+def main():
 
-# Train network
-model = train_model(train_features,train_targets,
-                    valid_features,valid_targets,
-                    dropout=0.50,
-                    epochs=50,
-                    filepath=f'data/model_weights_best_{model_label}.hdf5')
+    # Load bottleneck features and targets
+    with np.load('data/bottleneck_resnet50.npz') as data:
+        train_features = data['train_features']
+        train_targets = data['train_targets']
+        valid_features = data['valid_features']
+        valid_targets = data['valid_targets']
+        test_features = data['test_features']
+        test_targets = data['test_targets']
 
-# Evaluate network
-report = evaluate_model(model,test_features,test_targets)
-confMatrix = report['confusion_matrix']
+    # Label used to save the best model
+    model_label = 'Resnet50'
 
-# Store the confusion matrix in a JSON file for analysis
-report['confusion_matrix'] = report['confusion_matrix'].tolist()
-with open(f'data/model_weights_best_{model_label}_eval_report.json', 'w') as fp:
-    json.dump(report, fp)
+    # Train network
+    model = train_model(train_features,train_targets,
+                        valid_features,valid_targets,
+                        dropout=0.50,
+                        epochs=50,
+                        filepath=f'data/model_weights_best_{model_label}.hdf5')
 
-# Plot the confusion matrix and save to file
-plt.clf()
-fig = plt.figure(figsize=[6,4],dpi=150)
-ax = plt.subplot(1, 1, 1)
-pos = ax.imshow(confMatrix,cmap=plt.cm.Blues)
-fig.colorbar(pos, ax=ax)
-ax.set_xlabel('Predicted category')
-ax.set_ylabel('True category')
-ax.set_title('Confusion matrix')
-fig.savefig(f'data/model_weights_best_{model_label}_confusion_matrix.png',
-            bbox_inches='tight',
-            size=(3,2),
-            dpi=250)
+    # Evaluate network
+    report = evaluate_model(model,test_features,test_targets)
+    confMatrix = report['confusion_matrix']
 
-# Plot normalized confusion matrix and save to file
-plt.clf()
-fig = plt.figure(figsize=[6,4],dpi=150)
-ax = plt.subplot(1, 1, 1)
-# normalize confusion matrix
-for ix in range(confMatrix.shape[0]):
-    if confMatrix[ix,:].sum() > 0:
-        confMatrix[ix,:] = confMatrix[ix,:]/confMatrix[ix,:].sum()
-    else:
-        print(f"No test data for category {ix}")
-pos = ax.imshow(confMatrix,cmap=plt.cm.Blues)
-fig.colorbar(pos, ax=ax)
-ax.set_xlabel('Predicted category')
-ax.set_ylabel('True category')
-ax.set_title('Normalized confusion matrix')
-fig.savefig(f'data/model_weights_best_{model_label}_confusion_matrix_normalized.png',
-            bbox_inches='tight',
-            size=(3,2),
-            dpi=250)
+    # Store the confusion matrix in a JSON file for analysis
+    report['confusion_matrix'] = report['confusion_matrix'].tolist()
+    with open(f'data/model_weights_best_{model_label}_eval_report.json', 'w') as fp:
+        json.dump(report, fp)
+
+    # Plot the confusion matrix and save to file
+    plt.clf()
+    fig = plt.figure(figsize=[6,4],dpi=150)
+    ax = plt.subplot(1, 1, 1)
+    pos = ax.imshow(confMatrix,cmap=plt.cm.Blues)
+    fig.colorbar(pos, ax=ax)
+    ax.set_xlabel('Predicted category')
+    ax.set_ylabel('True category')
+    ax.set_title('Confusion matrix')
+    fig.savefig(f'data/model_weights_best_{model_label}_confusion_matrix.png',
+                bbox_inches='tight',
+                size=(3,2),
+                dpi=250)
+
+    # Plot normalized confusion matrix and save to file
+    plt.clf()
+    fig = plt.figure(figsize=[6,4],dpi=150)
+    ax = plt.subplot(1, 1, 1)
+    # normalize confusion matrix
+    for ix in range(confMatrix.shape[0]):
+        if confMatrix[ix,:].sum() > 0:
+            confMatrix[ix,:] = confMatrix[ix,:]/confMatrix[ix,:].sum()
+        else:
+            print(f"No test data for category {ix}")
+    pos = ax.imshow(confMatrix,cmap=plt.cm.Blues)
+    fig.colorbar(pos, ax=ax)
+    ax.set_xlabel('Predicted category')
+    ax.set_ylabel('True category')
+    ax.set_title('Normalized confusion matrix')
+    fig.savefig(f'data/model_weights_best_{model_label}_confusion_matrix_normalized.png',
+                bbox_inches='tight',
+                size=(3,2),
+                dpi=250)
+
+if __name__ == '__main__':
+    main()
