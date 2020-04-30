@@ -5,8 +5,8 @@ import json
 from sklearn import metrics
 from sklearn.datasets import load_files
 from keras.utils import np_utils
-from keras.layers import Conv2D, MaxPooling2D, GlobalAveragePooling2D
-from keras.layers import Dropout, Flatten, Dense
+from keras.layers import Conv2D, GlobalAveragePooling2D
+from keras.layers import Dropout, Flatten, Dense, Input
 from keras.models import Sequential
 from keras.callbacks import EarlyStopping, ModelCheckpoint
 from keras.applications.resnet50 import ResNet50, preprocess_input
@@ -36,8 +36,8 @@ def plot_fit_history(history,filepath):
         
     loss = history['loss']
     val_loss = history['val_loss']
-    acc = history['acc']
-    val_acc = history['val_acc']
+    acc = history['accuracy']
+    val_acc = history['val_accuracy']
     ep = range(len(loss))
 
     ax1.plot(ep,loss,

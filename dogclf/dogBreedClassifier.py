@@ -5,7 +5,8 @@ import cv2
 
 from keras.preprocessing import image                  
 from keras.applications.resnet50 import preprocess_input, decode_predictions
-from keras.applications.resnet50 import ResNet50
+#from keras.applications.resnet50 import ResNet50
+from tensorflow.keras.applications.resnet50 import ResNet50
 from keras.layers import GlobalAveragePooling2D
 from keras.layers import Dense
 from keras.models import Sequential
@@ -15,7 +16,7 @@ from tqdm import tqdm
 from tensorflow.python.keras.backend import set_session
 from tensorflow.python.keras.models import load_model
 
-sess = tf.Session()
+sess = tf.compat.v1.Session()
 # to ensure the graph is the same across all threads
 graph = tf.compat.v1.get_default_graph()
 
@@ -35,7 +36,7 @@ with graph.as_default():
 with graph.as_default():
     set_session(sess)
     dogBreedCNN = Sequential()
-    dogBreedCNN.add(GlobalAveragePooling2D(input_shape=(1,1,2048)))
+    dogBreedCNN.add(GlobalAveragePooling2D(input_shape=(7,7,2048)))
     dogBreedCNN.add(Dense(133, activation='softmax'))
     dogBreedCNN.load_weights('data/model_weights_best_Resnet50.hdf5')
 
