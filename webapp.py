@@ -4,7 +4,8 @@ from flask import render_template, jsonify
 from werkzeug.utils import secure_filename
 
 # Import dog bree classifier
-from dogclf import dogBreedClassifier
+from dogclf.classifiers import DogBreedClassifier
+dogBreedClassifier = DogBreedClassifier()
 
 # Direction where uploaded images by user are stored for classification
 UPLOAD_FOLDER = 'cache'
@@ -44,14 +45,15 @@ def classify_image(file):
     filename = secure_filename(file.filename)
     img_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
     file.save(img_path)
-       
-    if dogBreedClassifier.detect_dog(img_path):
-        dog_breed = dogBreedClassifier.classify_dog_breed(img_path)
+
+    (isDog, dog_breed) = dogBreedClassifier.classify_dog_breed(img_path)
+
+    if isDog == 1:
         message = {'message': 'We have a dog there and I think it is a <i> {:} </i><br/>'.format(dog_breed.replace('_',' ')) }
+    elif isDog == 0:
+        message = {'message': 'Not a dog hun! But isnt just like a <i> {:} </i><br/>'.format(dog_breed.replace('_',' ')) }
     else:
-        if dogBreedClassifier.detect_human_face(img_path):
-            dog_breed = dogBreedClassifier.classify_dog_breed(img_path)
-            message = {'message': 'Not a dog hun! But isnt just like a <i> {:} </i><br/>'.format(dog_breed.replace('_',' ')) }
+        message = {'message': 'I dont know what to look at'}
 
     return message
 
