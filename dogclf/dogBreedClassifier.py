@@ -13,12 +13,10 @@ from keras.models import Sequential
 import tensorflow as tf
 from tqdm import tqdm
 
-from tensorflow.python.keras.backend import set_session
-from tensorflow.python.keras.models import load_model
+from . import tf_session
+graph = tf_session.graph
+sess = tf_session.sess
 
-sess = tf.compat.v1.Session()
-# to ensure the graph is the same across all threads
-graph = tf.compat.v1.get_default_graph()
 
 with open('data/dog_names.json','r') as f:
     dog_names = json.load(f)
@@ -28,20 +26,17 @@ f.close()
 face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_alt.xml")
 
 # Pre-trained model on imagenet dataset used to detect dogs
-with graph.as_default():
-    set_session(sess)
+with graph.as_default() and sess.as_default():
     imagenet_model = ResNet50(weights='imagenet')
                             
 # ResNet-50 model to classify dog breed classification
-with graph.as_default():
-    set_session(sess)
+with graph.as_default() and sess.as_default():
     dogBreedCNN = Sequential()
     dogBreedCNN.add(GlobalAveragePooling2D(input_shape=(7,7,2048)))
     dogBreedCNN.add(Dense(133, activation='softmax'))
     dogBreedCNN.load_weights('data/model_weights_best_Resnet50.hdf5')
 
-with graph.as_default():
-    set_session(sess)
+with graph.as_default() and sess.as_default():
     featureExtractor = ResNet50(weights='imagenet', include_top=False)
 
 # Implementation of face detection
@@ -111,8 +106,8 @@ def predict_imagenet_labels(img_path):
     Returns label from prediction vector for image located at img_path
     '''    
     global graph
-    with graph.as_default():
-        set_session(sess)
+    global sess
+    with graph.as_default() and sess.as_default():
         img = preprocess_input(convert_path_to_tensor(img_path))
         prediction = imagenet_model.predict(img)
 
@@ -146,8 +141,8 @@ def extract_bottleneck_features(tensor):
     Extract bottleneck features
     '''    
     global graph
-    with graph.as_default():
-        set_session(sess)
+    global sess
+    with graph.as_default() and sess.as_default():
 
         return featureExtractor.predict(preprocess_input(tensor))
 
@@ -164,9 +159,8 @@ def predict_breed(img_path):
     Takes a path to an image as input and returns the dog breed that is predicted by the model.
     '''
     global graph
-    with graph.as_default():
-        set_session(sess)
-
+    global sess
+    with graph.as_default() and sess.as_default():
         # extract features
         features = extract_bottleneck_features(convert_path_to_tensor(img_path))
         # obtain predicted vector
@@ -187,21 +181,19 @@ def classify_dog_breed(img_path):
     Takes a path to an image and check if a dog or a human face is in the image.
     If True, then, predicts the dog breed (resembling dog breed for human face).
     '''    
-    global graph
-    with graph.as_default():
-        breed_id = None
-        
-        if detect_dog(img_path):
-            # image contains a dog
-            breed_id =  predict_breed(img_path)
-            print('Dog breed: {:}'.format(breed_id))
+    breed_id = None
+    
+    if detect_dog(img_path):
+        # image contains a dog
+        breed_id =  predict_breed(img_path)
+        print('Dog breed: {:}'.format(breed_id))
 
-        elif detect_human_face(img_path):
-            # image contains a human face
-            breed_id =  predict_breed(img_path)
-            print('Resembling dog breed: {:}'.format(breed_id))
+    elif detect_human_face(img_path):
+        # image contains a human face
+        breed_id =  predict_breed(img_path)
+        print('Resembling dog breed: {:}'.format(breed_id))
 
-        else:
-            raise("Image does not contain a dog nor a human face")
+    else:
+        raise("Image does not contain a dog nor a human face")
 
-        return breed_id
+    return breed_id
